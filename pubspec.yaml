@@ -1,0 +1,36 @@
+name: wake_up
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.0-290.1.beta
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  device_apps: ^2.2.0    # Telefondaki gerçek uygulamaları ve ikonları çeker
+  usage_stats: ^1.2.0    # Kullanım izni kontrolü yapar ve Ayarlar'a yönlendirir
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  # Paketi doğru yere (dev_dependencies altına) taşıdık:
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+
+  # Assets klasörünü uygulamaya tanıttık:
+  assets:
+    - assets/
+
+# İkon Üretme Ayarları (En altta kalması doğru)
+flutter_icons:
+  android: true
+  ios: false
+  image_path: "assets/alarm_logo.png"
+  adaptive_icon_background: "#0B101E"
+  adaptive_icon_foreground: "assets/alarm_logo.png"
