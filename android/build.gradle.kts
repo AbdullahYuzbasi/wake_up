@@ -22,3 +22,15 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+subprojects {
+    val project = this
+    project.plugins.withType<com.android.build.gradle.api.AndroidBasePlugin> {
+        val android = project.extensions.getByName("android") as com.android.build.gradle.BaseExtension
+
+        // SADECE namespace eksikse müdahale et (Finalized hatasını bu sayede almayacağız)
+        if (android.namespace == null) {
+            android.namespace = project.group.toString()
+        }
+    }
+}

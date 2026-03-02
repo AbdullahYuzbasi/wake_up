@@ -1,7 +1,37 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart'; // Yeni sayfamızı import ettik
+import 'package:alarm/alarm.dart';
+import 'screens/home_screen.dart';
+import 'state/global_state.dart';
+import 'screens/alarm_ring_screen.dart';
 
-void main() {
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+void main() async {
+  // 1. Flutter motorunun hazır olduğundan emin oluyoruz
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 2. Alarm servisini başlatıyoruz
+  await Alarm.init();
+
+  // 3. Hafızadaki ayarları (Shared Preferences) yükle
+  await GlobalState.loadSettings();
+
+  // 4. ALARM ÇALDIĞINDA NE OLACAK?
+  Alarm.ringStream.stream.listen((settings) async {
+    // 1. Önce GlobalState işlemini yap
+    GlobalState.onAlarmRing(settings);
+
+    // 2. Navigasyon için kısa bir gecikme eklemek bazen Android'in yetişmesini sağlar
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // 3. Ekranı fırlat
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (context) => AlarmRingScreen(alarmSettings: settings),
+      ),
+    );
+  });
+
   runApp(const WakeUpAlarmApp());
 }
 
@@ -11,6 +41,8 @@ class WakeUpAlarmApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      // ÇOK ÖNEMLİ: navigatorKey'i buraya bağlamazsan ekran fırlamaz!
+      navigatorKey: navigatorKey,
       title: 'Sabah Rutinim',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -21,9 +53,8 @@ class WakeUpAlarmApp extends StatelessWidget {
           primary: Color(0xFF00E5FF),
           secondary: Color(0xFF00E676),
         ),
-        dividerColor: Colors.transparent,
       ),
-      home: const SplashScreen(),
+      home: const HomeScreen(), // İlk açılan ekran
     );
   }
 }
@@ -147,7 +178,6 @@ class SplashScreen extends StatelessWidget {
                       elevation: 0,
                     ),
                     onPressed: () {
-                      // YENİ SAYFAYA GEÇİŞ KODU
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(builder: (context) => const HomeScreen()),

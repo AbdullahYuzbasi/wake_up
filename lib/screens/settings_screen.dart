@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../state/global_state.dart'; // GlobalState'e erişim için yolu kontrol et
 
 class SettingsScreen extends StatefulWidget {
   // Uygulama seçili mi (rutin aktif mi) bilgisini ana sayfadan alır.
@@ -13,10 +14,29 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   // --- STATE DEĞİŞKENLERİ ---
-  double alarmVolume = 65;
-  bool isFadeInEnabled = true;
-  bool isVibrationEnabled = true;
-  int snoozeDuration = 5; // Erteleme süresini tutacak değişken
+  late double alarmVolume;
+  late bool isFadeInEnabled;
+  late bool isVibrationEnabled;
+  late int snoozeDuration; // Erteleme süresini tutacak değişken
+
+  @override
+  void initState() {
+    super.initState();
+    // Sayfa açıldığında GlobalState'den güncel verileri çekiyoruz
+    alarmVolume = GlobalState.alarmVolume;
+    isFadeInEnabled = GlobalState.isFadeInEnabled;
+    isVibrationEnabled = GlobalState.isVibrationEnabled;
+    snoozeDuration = GlobalState.snoozeDuration;
+  }
+
+  // Yardımcı fonksiyon: Her değişimde hem local state'i hem GlobalState'i güncelle
+  void _updateAndSave() {
+    GlobalState.alarmVolume = alarmVolume;
+    GlobalState.isFadeInEnabled = isFadeInEnabled;
+    GlobalState.isVibrationEnabled = isVibrationEnabled;
+    GlobalState.snoozeDuration = snoozeDuration;
+    GlobalState.saveSettings(); // Telefona kaydet
+  }
 
   // --- ERTELEME SÜRESİ SEÇİCİ PANEL (BOTTOM SHEET) ---
   void _showSnoozePicker() {
@@ -128,6 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           setState(() {
                             snoozeDuration = tempDuration;
                           });
+                          _updateAndSave(); // Kaydet
                           Navigator.pop(context);
                         },
                         child: const Text(
@@ -220,6 +241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               setState(() {
                                 alarmVolume = value;
                               });
+                              _updateAndSave();
                             },
                           ),
                         ),
@@ -233,13 +255,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     trailingWidget: Switch(
                       value: isFadeInEnabled,
                       activeColor: const Color(0xFF00E5FF),
-                      activeTrackColor: const Color(0xFF00E5FF).withOpacity(0.3),
-                      inactiveThumbColor: Colors.grey,
-                      inactiveTrackColor: Colors.white12,
                       onChanged: (value) {
                         setState(() {
                           isFadeInEnabled = value;
                         });
+                        _updateAndSave();
                       },
                     ),
                   ),
@@ -259,31 +279,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     trailingWidget: Switch(
                       value: isVibrationEnabled,
                       activeColor: const Color(0xFF00E5FF),
-                      activeTrackColor: const Color(0xFF00E5FF).withOpacity(0.3),
-                      inactiveThumbColor: Colors.grey,
-                      inactiveTrackColor: Colors.white12,
                       onChanged: (value) {
                         setState(() {
                           isVibrationEnabled = value;
                         });
+                        _updateAndSave();
                       },
                     ),
                   ),
                   _buildDivider(),
 
-                  // DİNAMİK ERTELEME BUTONU KONTROLÜ
+                  // SADECE ERTELEME KISITLANMIŞTIR
                   if (widget.isRoutineActive)
-                  // Rutin aktifse butonu silikleştip nedenini gösteriyoruz
                     _buildListTile(
                       title: 'Erteleme Süresi',
                       subtitle: 'Uyanıklık testi aktifken erteleme kapalıdır.',
-                      titleColor: Colors.white30, // Silik yazı rengi
-                      subtitleColor: Colors.white24, // Silik alt yazı rengi
+                      titleColor: Colors.white30,
+                      subtitleColor: Colors.white24,
                       trailingWidget: const Icon(Icons.block, color: Colors.white24, size: 20),
-                      onTap: null, // Tıklama iptal
+                      onTap: null,
                     )
                   else
-                  // Rutin aktif değilse DİNAMİK çalışıyor (YENİ PANELE YÖNLENDİRİR)
                     _buildListTile(
                       title: 'Erteleme Süresi',
                       trailingWidget: Row(
@@ -295,7 +311,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                       onTap: () {
-                        _showSnoozePicker(); // Yeni paneli açan fonksiyon
+                        _showSnoozePicker();
                       },
                     ),
                 ],
@@ -370,7 +386,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // Parametrelere renk kontrolleri de eklendi
   Widget _buildListTile({
     required String title,
     String? subtitle,

@@ -16,16 +16,18 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.yuzbasi.wakeup.wake_up"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+
+        // Alarm paketinin stabil çalışması için minSdk en az 21 olmalı.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+
+        // Modern Android izinleri (Android 14+) için targetSdk 34 olmalı.
+        targetSdk = 34
+
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -41,4 +43,32 @@ android {
 
 flutter {
     source = "../.."
+}
+
+subprojects {
+    val project = this
+    // Sadece 'app' olmayan (dışarıdan gelen paketler) modüllere müdahale et
+    if (project.name != "app") {
+        project.plugins.withType<com.android.build.gradle.api.AndroidBasePlugin> {
+            val android = project.extensions.getByName("android") as com.android.build.gradle.BaseExtension
+
+            // 1. Namespace Yaması
+            if (android.namespace == null) {
+                android.namespace = project.group.toString()
+            }
+
+            // 2. Alt paketlerin Java seviyesini 17'ye çek
+            android.compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+        }
+
+        // 3. Alt paketlerin Kotlin seviyesini 17'ye çek (Hata buradaydı!)
+        project.tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
 }

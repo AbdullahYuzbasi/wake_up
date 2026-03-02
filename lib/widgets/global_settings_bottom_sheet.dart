@@ -232,15 +232,22 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
                   backgroundColor: const Color(0xFF00E5FF),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
-                onPressed: () {
-                  // KAYDET BUTONUNA BASILDIĞINDA GLOBAL STATE'İ GÜNCELLİYORUZ
+                onPressed: () async {
+                  // 1. RAM değerlerini güncelle
                   GlobalState.testDelayMinutes = testDelayMinutes;
                   GlobalState.selectedUsageDuration = selectedUsageDuration;
+
+                  // 2. Seçili paket isimlerini gerçek uygulama objeleriyle eşle
                   GlobalState.selectedApps = _installedApps
                       .where((app) => _selectedAppPackages.contains(app.packageName))
                       .toList();
 
-                  Navigator.pop(context);
+                  // 3. TELEFONA YAZ (KALICI YAP)
+                  await GlobalState.saveSettings();
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                  }
                 },
                 child: const Text(
                   'Kuralları Kaydet',

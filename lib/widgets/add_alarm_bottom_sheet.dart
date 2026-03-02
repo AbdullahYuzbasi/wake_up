@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../state/global_state.dart';
+import 'package:alarm/alarm.dart';
 
 class AddAlarmBottomSheet extends StatefulWidget {
   const AddAlarmBottomSheet({super.key});
@@ -8,13 +10,69 @@ class AddAlarmBottomSheet extends StatefulWidget {
 }
 
 class _AddAlarmBottomSheetState extends State<AddAlarmBottomSheet> {
-  // Seçili saati ve dakikayı tutacak değişkenler
-  int selectedHour = 0;
-  int selectedMinute = 0;
+  // Seçili saati ve dakikayı sistem saati ile başlatıyoruz
+  int selectedHour = DateTime.now().hour;
+  int selectedMinute = DateTime.now().minute;
+
+  // Çarkların başlangıç pozisyonu için controller'lar
+  late FixedExtentScrollController _hourController;
+  late FixedExtentScrollController _minuteController;
 
   // Günlerin isimleri ve seçili olma durumları
   final List<String> dayNames = ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
   List<bool> selectedDays = [false, false, false, false, false, false, false];
+
+  @override
+  void initState() {
+    super.initState();
+    // Controller'ları sistem saatine göre ayarlıyoruz
+    _hourController = FixedExtentScrollController(initialItem: selectedHour);
+    _minuteController = FixedExtentScrollController(initialItem: selectedMinute);
+  }
+
+  @override
+  void dispose() {
+    _hourController.dispose();
+    _minuteController.dispose();
+    super.dispose();
+  }
+
+  // Günleri yazıya döken yardımcı fonksiyon
+  String _getDaysText() {
+    List<String> selectedList = [];
+    for (int i = 0; i < 7; i++) {
+      if (selectedDays[i]) selectedList.add(dayNames[i]);
+    }
+    return selectedList.isEmpty ? "Tek seferlik" : selectedList.join(", ");
+  }
+
+  // Lokal Alarm Kurma Tetikleyicisi
+  Future<void> _scheduleNewAlarm(Map<String, dynamic> alarm) async {
+    int alarmId = alarm["id"] % 10000;
+    final parts = alarm["time"].split(':');
+    final hour = int.parse(parts[0]);
+    final minute = int.parse(parts[1]);
+
+    final now = DateTime.now();
+    var scheduledDate = DateTime(now.year, now.month, now.day, hour, minute);
+    if (scheduledDate.isBefore(now)) scheduledDate = scheduledDate.add(const Duration(days: 1));
+
+    final settings = AlarmSettings(
+      id: alarmId,
+      dateTime: scheduledDate,
+      assetAudioPath: 'assets/sounds/alarm.mp3',
+      loopAudio: true,
+      vibrate: GlobalState.isVibrationEnabled,
+      volume: GlobalState.alarmVolume / 100,
+      notificationSettings: NotificationSettings(
+        title: 'Uyanma Vakti!',
+        body: 'Uyanıklık testi seni bekliyor...',
+        stopButton: 'Durdur',
+        icon: '@mipmap/ic_launcher',
+      ),
+    );
+    await Alarm.set(alarmSettings: settings);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +146,7 @@ class _AddAlarmBottomSheetState extends State<AddAlarmBottomSheet> {
                       SizedBox(
                         width: 70,
                         child: ListWheelScrollView.useDelegate(
+                          controller: _hourController,
                           itemExtent: 60, // Her bir rakamın yüksekliği
                           perspective: 0.005,
                           diameterRatio: 1.2,
@@ -119,6 +178,7 @@ class _AddAlarmBottomSheetState extends State<AddAlarmBottomSheet> {
                       SizedBox(
                         width: 70,
                         child: ListWheelScrollView.useDelegate(
+                          controller: _minuteController,
                           itemExtent: 60,
                           perspective: 0.005,
                           diameterRatio: 1.2,
@@ -218,10 +278,28 @@ class _AddAlarmBottomSheetState extends State<AddAlarmBottomSheet> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                onPressed: () {
-                  // TODO: İleride burada alarmı veritabanına kaydedeceğiz.
-                  // Şimdilik sadece paneli kapatıyoruz.
-                  Navigator.pop(context);
+                onPressed: () async {
+                  String timeStr = "${selectedHour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')}";
+
+                  // 1. Yeni alarm datasını hazırla
+                  final newAlarm = {
+                    "id": DateTime.now().millisecondsSinceEpoch,
+                    "time": timeStr,
+                    "days": _getDaysText(),
+                    "isActive": true
+                  };
+
+                  // 2. GlobalState listesine yeni alarmı ekle
+                  GlobalState.alarms.add(newAlarm);
+
+                  // 3. Hafızaya kaydet
+                  await GlobalState.saveSettings();
+
+                  // 4. Sistemi alarma kur (OTOMATİK KURULUM)
+                  await _scheduleNewAlarm(newAlarm);
+
+                  // 5. Paneli kapat
+                  if (context.mounted) Navigator.pop(context);
                 },
                 child: const Text(
                   'Alarmı Kur',

@@ -4,6 +4,7 @@ import '../widgets/add_alarm_bottom_sheet.dart';
 import '../widgets/edit_alarm_bottom_sheet.dart';
 import '../widgets/global_settings_bottom_sheet.dart';
 import '../state/global_state.dart';
+import 'package:alarm/alarm.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,11 +14,79 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<Map<String, dynamic>> alarms = [
-    {"time": "07:30", "days": "Hafta İçi", "isActive": true},
-    {"time": "08:00", "days": "Hafta Sonu", "isActive": true},
-    {"time": "06:45", "days": "Pzt, Çar, Cum", "isActive": false},
-  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+
+  // Hafızadaki verileri yükleyen başlangıç fonksiyonu
+  Future<void> _loadInitialData() async {
+    await GlobalState.loadSettings();
+    // Uygulama açıldığında aktif alarmları sisteme tekrar kur (Garantiye al)
+    _rescheduleActiveAlarms();
+    setState(() {});
+  }
+
+  void _rescheduleActiveAlarms() {
+    for (var alarm in GlobalState.alarms) {
+      if (alarm["isActive"] == true) {
+        _handleAlarmSchedule(alarm, true);
+      }
+    }
+  }
+
+  // --- GERÇEK ALARM KURMA FONKSİYONU ---
+  Future<void> _handleAlarmSchedule(Map<String, dynamic> alarm, bool isActive) async {
+    int alarmId = alarm["id"] % 10000; // Paket için int ID gerekiyor
+
+    if (!isActive) {
+      print("Alarm kapatılıyor: $alarmId");
+      await Alarm.stop(alarmId);
+      return;
+    }
+
+    final parts = alarm["time"].split(':');
+    final hour = int.parse(parts[0]);
+    final minute = int.parse(parts[1]);
+
+    final now = DateTime.now();
+    var scheduledDate = DateTime(now.year, now.month, now.day, hour, minute);
+
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+
+    final alarmSettings = AlarmSettings(
+      id: alarmId,
+      dateTime: scheduledDate,
+      assetAudioPath: 'assets/sounds/alarm.mp3',
+      loopAudio: true,
+      vibrate: GlobalState.isVibrationEnabled,
+      volume: GlobalState.alarmVolume / 100,
+      fadeDuration: GlobalState.isFadeInEnabled ? 5.0 : 0.0,
+      notificationSettings: NotificationSettings(
+        title: 'Uyanma Vakti!',
+        body: 'Uyanıklık testi seni bekliyor...',
+        stopButton: 'Durdur',
+        icon: '@mipmap/ic_launcher', // Hata ihtimaline karşı varsayılan ikon
+      ),
+    );
+
+    // --- LOG BAŞLANGICI ---
+    print("Alarm kuruluyor... Hedef: $scheduledDate");
+    try {
+      await Alarm.set(alarmSettings: alarmSettings);
+      print("Alarm başarıyla kuruldu! Kurulan ID: ${alarmSettings.id}");
+
+      bool isSet = await Alarm.hasAlarm();
+      print("Sistemde aktif alarm var mı?: $isSet");
+    } catch (e) {
+      print("ALARM KURULURKEN HATA ÇIKTI: $e");
+    }
+    // --- LOG SONU ---
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +133,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildGlobalSettingsCard(),
                   const SizedBox(height: 24),
 
-                  ...alarms.asMap().entries.map((entry) {
+                  // Dinamik alarm listesi
+                  ...GlobalState.alarms.asMap().entries.map((entry) {
                     int index = entry.key;
                     var alarm = entry.value;
                     return Padding(
@@ -164,7 +234,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 20),
 
-          // TAŞMA HATASINI ÇÖZMEK İÇİN EXPANDED VE SIZEDBOX AYARI YAPILDI. SÜRELER DİNAMİK ALINDI.
           Row(
             children: [
               Expanded(child: _buildInfoItem(Icons.schedule, "Süre", "${GlobalState.testDelayMinutes.toInt()} Dk Sonra")),
@@ -174,7 +243,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 24),
 
-          // YENİ METİN VE UYGULAMA İKONLARI ALANI
           const Text(
             "Uyandığını kanıtlamak için takip edilecek uygulamalar:",
             style: TextStyle(color: Colors.white54, fontSize: 13),
@@ -222,7 +290,6 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Icon(icon, color: const Color(0xFF00E5FF), size: 20),
         ),
         const SizedBox(width: 10),
-        // TAŞMAYI ÖNLEMEK İÇİN İÇERİĞİ EXPANDED İÇİNE ALIP, GEREKİRSE 3 NOKTA KOYUYORUZ
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
           builder: (context) {
-            return const EditAlarmBottomSheet();
+            return EditAlarmBottomSheet(index: index);
           },
         );
         setState(() {});
@@ -285,10 +352,12 @@ class _HomeScreenState extends State<HomeScreen> {
               activeTrackColor: const Color(0xFF00E5FF).withOpacity(0.3),
               inactiveThumbColor: Colors.grey,
               inactiveTrackColor: Colors.white12,
-              onChanged: (bool value) {
+              onChanged: (bool value) async {
                 setState(() {
-                  alarms[index]["isActive"] = value;
+                  GlobalState.alarms[index]["isActive"] = value;
                 });
+                await GlobalState.saveSettings();
+                _handleAlarmSchedule(GlobalState.alarms[index], value);
               },
             ),
           ],

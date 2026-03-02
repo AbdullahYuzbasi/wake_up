@@ -12,6 +12,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   device_apps: ^2.2.0    # Telefondaki gerçek uygulamaları ve ikonları çeker
   usage_stats: ^1.2.0    # Kullanım izni kontrolü yapar ve Ayarlar'a yönlendirir
+  shared_preferences: ^2.5.4
+  audioplayers: ^6.5.1
+  vibration: ^3.1.8
+  alarm: ^4.0.0
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
@@ -25,7 +30,8 @@ flutter:
 
   # Assets klasörünü uygulamaya tanıttık:
   assets:
-    - assets/
+    - assets/alarm_logo.png
+    - assets/sounds/alarm.mp3
 
 # İkon Üretme Ayarları (En altta kalması doğru)
 flutter_icons:
