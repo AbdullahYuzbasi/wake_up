@@ -14,7 +14,8 @@ class _EditAlarmBottomSheetState extends State<EditAlarmBottomSheet> {
   late int selectedHour;
   late int selectedMinute;
   late List<bool> selectedDays;
-  final List<String> dayNames = ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
+  // ÇÖZÜM 1: Gün isimleri 3 harfli yapıldı
+  final List<String> dayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
   @override
   void initState() {
@@ -25,7 +26,7 @@ class _EditAlarmBottomSheetState extends State<EditAlarmBottomSheet> {
     selectedHour = int.parse(timeParts[0]);
     selectedMinute = int.parse(timeParts[1]);
 
-    // Günleri mevcut veriye göre eşleştiriyoruz
+    // ÇÖZÜM 1: Günleri mevcut veriye göre indeks bazlı eşleştiriyoruz
     String daysText = alarm["days"];
     selectedDays = dayNames.map((name) => daysText.contains(name)).toList();
   }
@@ -119,7 +120,7 @@ class _EditAlarmBottomSheetState extends State<EditAlarmBottomSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8, // Gün seçici eklendiği için uzatıldı
+      height: MediaQuery.of(context).size.height * 0.8,
       decoration: const BoxDecoration(
         color: Color(0xFF0B101E),
         borderRadius: BorderRadius.only(
@@ -175,12 +176,12 @@ class _EditAlarmBottomSheetState extends State<EditAlarmBottomSheet> {
                 onTap: () => setState(() => selectedDays[index] = !selectedDays[index]),
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: 35, height: 35,
+                  width: 40, height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: selectedDays[index] ? const Color(0xFF00E5FF) : const Color(0xFF1E2638),
                   ),
-                  child: Center(child: Text(dayNames[index], style: TextStyle(color: selectedDays[index] ? Colors.black : Colors.white54, fontWeight: FontWeight.bold, fontSize: 12))),
+                  child: Center(child: Text(dayNames[index], style: TextStyle(color: selectedDays[index] ? Colors.black : Colors.white54, fontWeight: FontWeight.bold, fontSize: 11))),
                 ),
               );
             }),
@@ -209,6 +210,7 @@ class _EditAlarmBottomSheetState extends State<EditAlarmBottomSheet> {
                           GlobalState.alarms[widget.index]["time"] = newTime;
                           GlobalState.alarms[widget.index]["days"] = _getDaysText();
                           await GlobalState.saveSettings();
+                          // ÇÖZÜM 3: Otomatik güncelleme tetiklendi
                           await _updateSystemAlarm(GlobalState.alarms[widget.index]);
                           if (context.mounted) Navigator.pop(context);
                         },

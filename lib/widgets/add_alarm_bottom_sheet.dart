@@ -18,8 +18,8 @@ class _AddAlarmBottomSheetState extends State<AddAlarmBottomSheet> {
   late FixedExtentScrollController _hourController;
   late FixedExtentScrollController _minuteController;
 
-  // Günlerin isimleri ve seçili olma durumları
-  final List<String> dayNames = ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
+  // ÇÖZÜM 1: Gün isimleri 3 harfli yapıldı
+  final List<String> dayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
   List<bool> selectedDays = [false, false, false, false, false, false, false];
 
   @override
@@ -252,6 +252,7 @@ class _AddAlarmBottomSheetState extends State<AddAlarmBottomSheet> {
                           style: TextStyle(
                             color: isSelected ? Colors.black : Colors.white54,
                             fontWeight: FontWeight.bold,
+                            fontSize: 12, // Kısaltmalar için font küçültüldü
                           ),
                         ),
                       ),
@@ -265,7 +266,6 @@ class _AddAlarmBottomSheetState extends State<AddAlarmBottomSheet> {
           const SizedBox(height: 30),
 
           // --- KAYDET BUTONU ---
-          // Alt boşluk (bottom) 40 yapılarak buton yukarı alındı
           Padding(
             padding: const EdgeInsets.only(left: 24.0, right: 24.0, top: 20.0, bottom: 33.0),
             child: SizedBox(
@@ -295,7 +295,7 @@ class _AddAlarmBottomSheetState extends State<AddAlarmBottomSheet> {
                   // 3. Hafızaya kaydet
                   await GlobalState.saveSettings();
 
-                  // 4. Sistemi alarma kur (OTOMATİK KURULUM)
+                  // 4. Sistemi alarma kur (OTOMATİK KURULUM - ÇÖZÜM 3)
                   await _scheduleNewAlarm(newAlarm);
 
                   // 5. Paneli kapat
