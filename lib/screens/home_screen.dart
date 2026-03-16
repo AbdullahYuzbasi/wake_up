@@ -2,31 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:wake_up/screens/settings_screen.dart';
 import '../widgets/add_alarm_bottom_sheet.dart';
 import '../widgets/edit_alarm_bottom_sheet.dart';
-import '../widgets/global_settings_bottom_sheet.dart';
 import '../state/global_state.dart';
 import 'package:alarm/alarm.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _fabController;
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+    _fabController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    )..repeat(reverse: true);
   }
 
-  // Hafızadaki verileri yükleyen başlangıç fonksiyonu
+  @override
+  void dispose() {
+    _fabController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadInitialData() async {
     await GlobalState.loadSettings();
-    // Uygulama açıldığında aktif alarmları sisteme tekrar kur (Garantiye al)
     _rescheduleActiveAlarms();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   void _rescheduleActiveAlarms() {
@@ -37,26 +44,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // --- GERÇEK ALARM KURMA FONKSİYONU ---
   Future<void> _handleAlarmSchedule(Map<String, dynamic> alarm, bool isActive) async {
-    int alarmId = alarm["id"] % 10000; // Paket için int ID gerekiyor
-
+    int alarmId = alarm["id"] % 10000;
     if (!isActive) {
-      print("Alarm kapatılıyor: $alarmId");
       await Alarm.stop(alarmId);
       return;
     }
-
     final parts = alarm["time"].split(':');
     final hour = int.parse(parts[0]);
     final minute = int.parse(parts[1]);
-
     final now = DateTime.now();
     var scheduledDate = DateTime(now.year, now.month, now.day, hour, minute);
-
-    if (scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
-    }
+    if (scheduledDate.isBefore(now)) scheduledDate = scheduledDate.add(const Duration(days: 1));
 
     final alarmSettings = AlarmSettings(
       id: alarmId,
@@ -66,32 +65,27 @@ class _HomeScreenState extends State<HomeScreen> {
       vibrate: GlobalState.isVibrationEnabled,
       volume: GlobalState.alarmVolume / 100,
       fadeDuration: GlobalState.isFadeInEnabled ? 5.0 : 0.0,
-      notificationSettings: NotificationSettings(
-        title: 'Uyanma Vakti!',
-        body: 'Uyanıklık testi seni bekliyor...',
-        stopButton: 'Durdur',
-        icon: '@mipmap/ic_launcher', // Hata ihtimaline karşı varsayılan ikon
+      androidFullScreenIntent: true, // Kilit ekranını delip geçer
+      notificationSettings: const NotificationSettings(
+        title: 'WAKE UP!',
+        body: 'Görevi tamamlamak için dokun!',
+        stopButton: null, // Asla susturma butonu koyma
+        icon: '@mipmap/ic_launcher',
       ),
     );
-
-    // --- LOG BAŞLANGICI ---
-    print("Alarm kuruluyor... Hedef: $scheduledDate");
-    try {
-      await Alarm.set(alarmSettings: alarmSettings);
-      print("Alarm başarıyla kuruldu! Kurulan ID: ${alarmSettings.id}");
-
-      bool isSet = await Alarm.hasAlarm();
-      print("Sistemde aktif alarm var mı?: $isSet");
-    } catch (e) {
-      print("ALARM KURULURKEN HATA ÇIKTI: $e");
-    }
-    // --- LOG SONU ---
+    try { await Alarm.set(alarmSettings: alarmSettings); } catch (e) { debugPrint(e.toString()); }
   }
 
   @override
   Widget build(BuildContext context) {
+    bool isLight = GlobalState.themeMode == "light";
+    Color bgColor = GlobalState.themeMode == "custom" ? GlobalState.customBgColor : (isLight ? Colors.white : const Color(0xFF0B101E));
+    Color cardColor = isLight ? const Color(0xFFF5F6F9) : const Color(0xFF161F30);
+    Color textColor = isLight ? Colors.black : Colors.white;
+    Color accentColor = GlobalState.themeMode == "custom" ? GlobalState.accentColor : const Color(0xFF00E5FF);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0B101E),
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -100,267 +94,130 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Alarmlar',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF161F30),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.settings_outlined, color: Colors.white70),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SettingsScreen(isRoutineActive: GlobalState.isRoutineActive),
-                          ),
-                        );
-                        setState(() {});
-                      },
-                    ),
+                  Text('Alarmlar', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: textColor)),
+                  IconButton(
+                    icon: Icon(Icons.settings_outlined, color: textColor.withOpacity(0.7)),
+                    onPressed: () async {
+                      await Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
+                      setState(() {});
+                    },
                   ),
                 ],
               ),
             ),
-
             Expanded(
-              child: ListView(
+              child: GlobalState.alarms.isEmpty
+                  ? Center(child: Text("Henüz alarm yok", style: TextStyle(color: textColor.withOpacity(0.3))))
+                  : ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                children: [
-                  _buildGlobalSettingsCard(),
-                  const SizedBox(height: 24),
-
-                  // Dinamik alarm listesi
-                  ...GlobalState.alarms.asMap().entries.map((entry) {
-                    int index = entry.key;
-                    var alarm = entry.value;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: _buildAlarmCard(alarm, index),
-                    );
-                  }).toList(),
-
-                  const SizedBox(height: 80),
-                ],
+                itemCount: GlobalState.alarms.length,
+                itemBuilder: (context, index) => _buildAlarmCard(GlobalState.alarms[index], index, cardColor, accentColor, textColor),
               ),
             ),
           ],
         ),
       ),
-
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF00E5FF).withOpacity(0.4),
-              blurRadius: 20,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: FloatingActionButton(
-          backgroundColor: const Color(0xFF00E5FF),
-          foregroundColor: Colors.black,
-          elevation: 0,
-          onPressed: () async {
-            await showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (context) {
-                return const AddAlarmBottomSheet();
-              },
-            );
-            setState(() {});
-          },
-          child: const Icon(Icons.add, size: 32),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGlobalSettingsCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161F30),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white12, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'SABAH RUTİNİM',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF00E5FF),
-                  letterSpacing: 2.0,
-                  shadows: [Shadow(blurRadius: 15, color: Color(0xFF00E5FF))],
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.edit, size: 18, color: Color(0xFF00E5FF)),
-                  onPressed: () async {
-                    await showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) {
-                        return const GlobalSettingsBottomSheet();
-                      },
-                    );
-                    setState(() {});
-                  },
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(8),
-                ),
-              )
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          Row(
-            children: [
-              Expanded(child: _buildInfoItem(Icons.schedule, "Süre", "${GlobalState.testDelayMinutes.toInt()} Dk Sonra")),
-              const SizedBox(width: 16),
-              Expanded(child: _buildInfoItem(Icons.hourglass_empty, "Hedef Kullanım", "${GlobalState.selectedUsageDuration} Dk")),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          const Text(
-            "Uyandığını kanıtlamak için takip edilecek uygulamalar:",
-            style: TextStyle(color: Colors.white54, fontSize: 13),
-          ),
-          const SizedBox(height: 12),
-
-          Row(
-            children: GlobalState.selectedApps.isEmpty
-                ? [
-              const Expanded(
-                child: Text(
-                  "Henüz uygulama seçilmedi. Hadi seçin!",
-                  style: TextStyle(color: Colors.white70, fontSize: 13, fontStyle: FontStyle.italic),
-                ),
-              )
-            ]
-                : GlobalState.selectedApps.take(5).map((app) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 12.0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.memory(
-                    app.icon,
-                    width: 32,
-                    height: 32,
-                  ),
-                ),
-              );
-            }).toList(),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoItem(IconData icon, String title, String value) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF00E5FF).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: const Color(0xFF00E5FF), size: 20),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(color: Colors.white54, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAlarmCard(Map<String, dynamic> alarm, int index) {
-    return GestureDetector(
-      onTap: () async {
-        await showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (context) {
-            return EditAlarmBottomSheet(index: index);
-          },
-        );
-        setState(() {});
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF161F30),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white12, width: 1),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  alarm["time"],
-                  style: TextStyle(
-                    fontSize: 40,
-                    fontWeight: FontWeight.w900,
-                    color: alarm["isActive"] ? Colors.white : Colors.white38,
-                  ),
-                ),
-                Text(
-                  alarm["days"],
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: alarm["isActive"] ? Colors.white70 : Colors.white30,
-                  ),
+      floatingActionButton: AnimatedBuilder(
+        animation: _fabController,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withOpacity(0.3 * _fabController.value),
+                  blurRadius: 15,
+                  spreadRadius: 5,
                 ),
               ],
             ),
-            Switch(
-              value: alarm["isActive"],
-              activeColor: const Color(0xFF00E5FF),
-              activeTrackColor: const Color(0xFF00E5FF).withOpacity(0.3),
-              inactiveThumbColor: Colors.grey,
-              inactiveTrackColor: Colors.white12,
-              onChanged: (bool value) async {
-                setState(() {
-                  GlobalState.alarms[index]["isActive"] = value;
-                });
-                await GlobalState.saveSettings();
-                _handleAlarmSchedule(GlobalState.alarms[index], value);
+            child: FloatingActionButton.extended(
+              backgroundColor: accentColor,
+              foregroundColor: Colors.black,
+              onPressed: () async {
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => const AddAlarmBottomSheet(),
+                );
+                setState(() {});
               },
+              label: const Text("ALARM KUR", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+              icon: const Icon(Icons.add_alarm),
             ),
-          ],
+          );
+        },
+      ),
+    );
+  }
+
+  // home_screen.dart içindeki _buildAlarmCard fonksiyonunun ilgili kısmı:
+  Widget _buildAlarmCard(Map<String, dynamic> alarm, int index, Color cardColor, Color accentColor, Color textColor) {
+    bool isActive = alarm["isActive"] ?? false;
+
+    // Uygulama seçilip seçilmediğini kontrol et
+    String packageName = alarm["packageName"] ?? "";
+    String subTitle = "";
+
+    if (packageName.isEmpty) {
+      // Klasik Alarm Durumu
+      int snooze = (alarm["snooze"] as num? ?? 5).toInt();
+      subTitle = "Klasik Alarm • Ertele: $snooze dk";
+    } else {
+      // Görevli Alarm Durumu
+      String appName = alarm["appName"] ?? "Uygulama";
+      subTitle = "Görev: $appName";
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: GestureDetector(
+        onTap: () async {
+          await showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => EditAlarmBottomSheet(index: index),
+          );
+          setState(() {});
+        },
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(24)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                    alarm["time"],
+                    style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: isActive ? textColor : textColor.withOpacity(0.3)
+                    )
+                ),
+                // YENİLENEN ALT METİN:
+                Text(
+                    subTitle,
+                    style: TextStyle(fontSize: 12, color: textColor.withOpacity(0.5), fontWeight: FontWeight.w600)
+                ),
+                Text(
+                    alarm["days"],
+                    style: TextStyle(fontSize: 11, color: textColor.withOpacity(0.3))
+                ),
+              ]),
+              Switch(
+                value: alarm["isActive"] ?? false, // Burası doğrudan GlobalState verisini okumalı
+                activeColor: accentColor,
+                onChanged: (val) {
+                  setState(() => GlobalState.alarms[index]["isActive"] = val);
+                  GlobalState.saveSettings();
+                  _handleAlarmSchedule(GlobalState.alarms[index], val);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

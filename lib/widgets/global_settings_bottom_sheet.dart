@@ -1,3 +1,4 @@
+/*
 import 'package:flutter/material.dart';
 import 'package:device_apps/device_apps.dart';
 import 'package:usage_stats/usage_stats.dart';
@@ -11,7 +12,6 @@ class GlobalSettingsBottomSheet extends StatefulWidget {
 }
 
 class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
-  // --- STATE DEĞİŞKENLERİ ---
   late double testDelayMinutes;
   late int selectedUsageDuration;
 
@@ -23,31 +23,21 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
   @override
   void initState() {
     super.initState();
-    // PANEL AÇILDIĞINDA HAFIZADAKİ (GLOBAL STATE) DEĞERLERİ ÇEKİYORUZ
     testDelayMinutes = GlobalState.testDelayMinutes;
     selectedUsageDuration = GlobalState.selectedUsageDuration;
     _selectedAppPackages = GlobalState.selectedApps.map((app) => app.packageName).toSet();
-
     _checkPermissionAndLoadApps();
   }
 
   Future<void> _checkPermissionAndLoadApps() async {
-    setState(() {
-      _isLoadingApps = true;
-    });
-
+    setState(() => _isLoadingApps = true);
     bool isGranted = await UsageStats.checkUsagePermission() ?? false;
-
-    setState(() {
-      _hasUsagePermission = isGranted;
-    });
+    setState(() => _hasUsagePermission = isGranted);
 
     if (isGranted) {
       _loadRealApps();
     } else {
-      setState(() {
-        _isLoadingApps = false;
-      });
+      setState(() => _isLoadingApps = false);
     }
   }
 
@@ -57,9 +47,7 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
       includeSystemApps: true,
       onlyAppsWithLaunchIntent: true,
     );
-
     apps.sort((a, b) => a.appName.toLowerCase().compareTo(b.appName.toLowerCase()));
-
     setState(() {
       _installedApps = apps.cast<ApplicationWithIcon>();
       _isLoadingApps = false;
@@ -68,11 +56,19 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // --- DİNAMİK RENK VE TEMA TANIMLARI ---
+    bool isLight = GlobalState.themeMode == "light";
+    Color bgColor = isLight ? Colors.white : const Color(0xFF0B101E);
+    Color cardColor = isLight ? const Color(0xFFF5F6F9) : const Color(0xFF161F30);
+    Color textColor = isLight ? Colors.black : Colors.white;
+    Color subTextColor = isLight ? Colors.black54 : Colors.white54;
+    Color accentColor = GlobalState.themeMode == "custom" ? GlobalState.accentColor : const Color(0xFF00E5FF);
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0B101E),
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(30),
           topRight: Radius.circular(30),
         ),
@@ -80,17 +76,18 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Padding(
             padding: const EdgeInsets.all(24.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Uyanıklık Testini Ayarla',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54),
+                  icon: Icon(Icons.close, color: subTextColor),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -103,34 +100,33 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Soru 1
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Alarm kapandıktan sonra test kaç dakika açık kalsın?',
-                          style: TextStyle(color: Colors.white54, fontSize: 13),
+                          style: TextStyle(color: subTextColor, fontSize: 13),
                         ),
                       ),
                       Text(
                         '${testDelayMinutes.toInt()} dk',
-                        style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
                   SliderTheme(
                     data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: const Color(0xFF00E5FF),
-                      inactiveTrackColor: Colors.white12,
-                      thumbColor: const Color(0xFF00E5FF),
+                      activeTrackColor: accentColor,
+                      inactiveTrackColor: accentColor.withOpacity(0.1),
+                      thumbColor: accentColor,
                       trackHeight: 4.0,
                     ),
                     child: Slider(
                       value: testDelayMinutes,
-                      min: 1,
-                      max: 10,
-                      divisions: 9,
+                      min: 1, max: 10, divisions: 9,
                       onChanged: (value) {
                         setState(() {
                           testDelayMinutes = value;
@@ -143,9 +139,10 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
                   ),
                   const SizedBox(height: 30),
 
-                  const Text(
+                  // Soru 2
+                  Text(
                     'Seçtiğin uygulamaların herhangi birinde kaç dakika kalmalısın?',
-                    style: TextStyle(color: Colors.white54, fontSize: 13),
+                    style: TextStyle(color: subTextColor, fontSize: 13),
                   ),
                   const SizedBox(height: 15),
                   Row(
@@ -157,26 +154,22 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
                         onTap: () {
                           setState(() {
                             selectedUsageDuration = duration;
-                            if (testDelayMinutes < duration) {
-                              testDelayMinutes = duration.toDouble();
-                            }
+                            if (testDelayMinutes < duration) testDelayMinutes = duration.toDouble();
                           });
                         },
                         child: Container(
-                          width: 60,
+                          width: 55,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF1E2638),
+                            color: isSelected ? accentColor : cardColor,
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: isSelected
-                                ? [BoxShadow(color: const Color(0xFF00E5FF).withOpacity(0.3), blurRadius: 10)]
-                                : [],
+                            boxShadow: isSelected ? [BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 10)] : [],
                           ),
                           child: Center(
                             child: Text(
                               '$duration dk',
                               style: TextStyle(
-                                color: isSelected ? Colors.black : Colors.white70,
+                                color: isSelected ? Colors.black : subTextColor,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -187,33 +180,33 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
                   ),
                   const SizedBox(height: 40),
 
-                  const Text(
+                  // Uygulama Listesi Başlığı
+                  Text(
                     'SABAH RUTİNİM',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF00E5FF),
+                      color: accentColor,
                       letterSpacing: 2.0,
-                      shadows: [Shadow(blurRadius: 15)],
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Sabah kontrol edilecek uygulamaları listeden seç:',
-                    style: TextStyle(color: Colors.white54, fontSize: 13),
+                  Text(
+                    'Sabah kontrol edilecek uygulamaları seç:',
+                    style: TextStyle(color: subTextColor, fontSize: 13),
                   ),
                   const SizedBox(height: 15),
 
                   Container(
-                    height: 280,
+                    height: 250,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF121A2F),
+                      color: cardColor,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white12, width: 1.5),
+                      border: Border.all(color: textColor.withOpacity(0.05), width: 1.5),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: _buildAppListArea(),
+                      child: _buildAppListArea(accentColor, cardColor, textColor, subTextColor),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -222,32 +215,25 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
             ),
           ),
 
+          // Kaydet Butonu
           Padding(
-            padding: const EdgeInsets.only(left: 24.0, right: 24.0, top: 24.0, bottom: 40.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
             child: SizedBox(
               width: double.infinity,
               height: 60,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00E5FF),
+                  backgroundColor: accentColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 onPressed: () async {
-                  // 1. RAM değerlerini güncelle
                   GlobalState.testDelayMinutes = testDelayMinutes;
                   GlobalState.selectedUsageDuration = selectedUsageDuration;
-
-                  // 2. Seçili paket isimlerini gerçek uygulama objeleriyle eşle
                   GlobalState.selectedApps = _installedApps
                       .where((app) => _selectedAppPackages.contains(app.packageName))
                       .toList();
-
-                  // 3. TELEFONA YAZ (KALICI YAP)
                   await GlobalState.saveSettings();
-
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                  }
+                  if (mounted) Navigator.pop(context);
                 },
                 child: const Text(
                   'Kuralları Kaydet',
@@ -261,44 +247,22 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
     );
   }
 
-  Widget _buildAppListArea() {
-    if (_isLoadingApps) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)));
-    }
+  Widget _buildAppListArea(Color accent, Color card, Color text, Color subText) {
+    if (_isLoadingApps) return Center(child: CircularProgressIndicator(color: accent));
 
     if (!_hasUsagePermission) {
-      return SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 42),
-              const SizedBox(height: 10),
-              const Text("Takip İzni Gerekli", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              const Text(
-                "Hangi uygulamaya girdiğini algılayabilmemiz için 'Kullanım Verilerine Erişim' izni vermelisin.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white54, fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00E5FF),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () async {
-                  await UsageStats.grantUsagePermission();
-                },
-                child: const Text("Ayarlara Git", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-              ),
-              TextButton(
-                onPressed: _checkPermissionAndLoadApps,
-                child: const Text("İzin Verdim, Yenile", style: TextStyle(color: Colors.white70)),
-              )
-            ],
-          ),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.security, color: Colors.orange, size: 40),
+            const SizedBox(height: 10),
+            Text("İzin Gerekli", style: TextStyle(color: text, fontWeight: FontWeight.bold)),
+            TextButton(
+              onPressed: () async => await UsageStats.grantUsagePermission(),
+              child: Text("Ayarlara Git", style: TextStyle(color: accent)),
+            ),
+          ],
         ),
       );
     }
@@ -310,57 +274,29 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
         ApplicationWithIcon app = _installedApps[index];
         bool isSelected = _selectedAppPackages.contains(app.packageName);
 
-        return GestureDetector(
+        return InkWell(
           onTap: () {
             setState(() {
-              if (isSelected) {
-                _selectedAppPackages.remove(app.packageName);
-              } else {
-                _selectedAppPackages.add(app.packageName);
-              }
+              if (isSelected) _selectedAppPackages.remove(app.packageName);
+              else _selectedAppPackages.add(app.packageName);
             });
           },
           child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF161F30),
+              color: isSelected ? accent.withOpacity(0.1) : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isSelected ? const Color(0xFF00E5FF) : Colors.transparent,
-                width: 1.5,
-              ),
             ),
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.memory(app.icon, width: 36, height: 36),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    app.appName,
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
-                  ),
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isSelected ? const Color(0xFF00E5FF) : Colors.transparent,
-                    border: Border.all(
-                      color: isSelected ? const Color(0xFF00E5FF) : Colors.white30,
-                      width: 2,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(2.0),
-                    child: Icon(
-                      Icons.check,
-                      size: 14,
-                      color: isSelected ? Colors.black : Colors.transparent,
-                    ),
-                  ),
+                Image.memory(app.icon, width: 32, height: 32),
+                const SizedBox(width: 12),
+                Expanded(child: Text(app.appName, style: TextStyle(color: text, fontSize: 14))),
+                Icon(
+                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                  color: isSelected ? accent : subText,
+                  size: 20,
                 ),
               ],
             ),
@@ -370,3 +306,6 @@ class _GlobalSettingsBottomSheetState extends State<GlobalSettingsBottomSheet> {
     );
   }
 }
+
+*/
+
